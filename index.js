@@ -9,56 +9,48 @@ const zk = new ZKLib(
     5200,
     5000
 )
-
 const { LocalStorage } = require('node-localstorage');
 const localStorage = new LocalStorage('./scratch');
-
-function hasArrayChanged(newArr, oldArr) {
-    return JSON.stringify(newArr) !== JSON.stringify(oldArr);
-}
-
 var i = 0
 
 async function getTodayLogs() {
 
     try {
         await zk.createSocket()
-        const arr = [];
+        var arr = [];
 
-        console.log('[✓] Kết nối thành công với máy chấm công.' + i++)
-        const defaultTime = '2025-04-09T14:48:17.000Z'
-        const rawSavedTime = localStorage.getItem('time') == null ? defaultTime : localStorage.getItem('time')
-        const compareTime = new Date(rawSavedTime)
-        const logData = await zk.getAttendances()
-        for (let log of logData.data) {
-            const rawTime = log.recordTime || log.timestamp
-            if (!rawTime) continue
+        while (true) {
 
-            const logTime = new Date(rawTime)
-            if (isNaN(logTime.getTime())) continue
+            console.log('[✓] Kết nối thành công với máy chấm công lần thứ: ' + i++)
+            const defaultTime = '2025-04-09T14:48:17.000Z'
+            const rawSavedTime = localStorage.getItem('time') == null ? defaultTime : localStorage.getItem('time')
+            const compareTime = new Date(rawSavedTime)
+            const logData = await zk.getAttendances()
 
-            if (logTime > compareTime) {
-                arr.push({
-                    user_id: log.deviceUserId,
-                    time: log.recordTime
-                })
+            for (let log of logData.data) {
+                const rawTime = log.recordTime
+
+                const logTime = new Date(rawTime)
+                if (isNaN(logTime.getTime())) continue
+
+                if (logTime > compareTime) {
+                    arr.push({
+                        id: log.userSn,
+                        user_id: log.deviceUserId,
+                        time: log.recordTime
+                    })
+                }
             }
-        }
+            console.log(arr);
 
-        if (arr.length > 0) {
-            localStorage.setItem('time', arr[arr.length - 1].time)
-        }
-
-        let oldArray = JSON.parse(localStorage.getItem('myArray')) || [];
-
-        if (arr.length > 0) {
-            if (hasArrayChanged(arr, oldArray)) {
+            if (arr.length > 0) {
+                localStorage.setItem('time', arr[arr.length - 1].time);
                 await axios.post(process.env.LARAVEL_API, {
                     attendances: arr
                 })
-                localStorage.setItem('myArray', JSON.stringify(arr));
-                console.log("Đã call api");
+                console.log("Đã cập nhật điểm danh!!");
             }
+            await sleep(2000)
         }
 
         zk.disconnect()
@@ -68,8 +60,11 @@ async function getTodayLogs() {
 
     setTimeout(() => {
         getTodayLogs()
-    }, 5000)
+    }, 2000)
 }
+
+
+
 
 getTodayLogs();
 
